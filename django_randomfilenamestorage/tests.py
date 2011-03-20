@@ -1,19 +1,17 @@
 import re
 
 from django.core.files.base import ContentFile
-from django.core.files.storage import FileSystemStorage
 from django.test import TestCase
 
-from django_randomfilenamestorage.storage import RandomFilenameMetaStorage
-
-
-RandomFilenameStorage = RandomFilenameMetaStorage(FileSystemStorage)
+from django_randomfilenamestorage.storage import (
+    RandomFilenameMetaStorage, RandomFilenameFileSystemStorage
+)
 
 
 class RandomFilenameTestCase(TestCase):
     def test_get_available_name(self):
         length = 16
-        storage = RandomFilenameStorage(length=length)
+        storage = RandomFilenameFileSystemStorage(length=length)
         name = storage.get_available_name('')
         self.assertTrue(re.match(r'[0-9a-z]{%d}$' % length, name),
                         '%r is invalid.' % name)
@@ -33,7 +31,7 @@ class RandomFilenameTestCase(TestCase):
 
     def test_save(self):
         length = 16
-        storage = RandomFilenameStorage(length=length)
+        storage = RandomFilenameFileSystemStorage(length=length)
         name1 = storage.save('foo/bar\.txt', ContentFile('Hello world!'))
         storage.delete(name1)
         self.assertTrue(re.match(r'foo/[0-9a-z]{%d}\.txt$' % length,

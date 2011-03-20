@@ -3,7 +3,7 @@ import random
 import string
 
 from django.conf import settings
-from django.core.files.storage import Storage
+from django.core.files.storage import Storage, FileSystemStorage
 
 
 def random_string(length):
@@ -32,3 +32,8 @@ def RandomFilenameMetaStorage(storage_class):
 
     RandomFilenameStorage.__name__ = 'RandomFilename' + storage_class.__name__
     return RandomFilenameStorage
+
+
+RandomFilenameFileSystemStorage = RandomFilenameMetaStorage(
+    storage_class=FileSystemStorage,
+)
