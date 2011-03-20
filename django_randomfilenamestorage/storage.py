@@ -6,8 +6,11 @@ from django.conf import settings
 from django.core.files.storage import Storage, FileSystemStorage
 
 
+CHARACTERS = string.lowercase + string.digits
+
+
 def random_string(length):
-    return ''.join(random.sample(string.lowercase + string.digits, length))
+    return ''.join(random.choice(CHARACTERS) for i in xrange(length))
 
 
 def RandomFilenameMetaStorage(storage_class):
