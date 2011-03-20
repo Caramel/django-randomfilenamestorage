@@ -3,11 +3,12 @@ import random
 import string
 
 
-from django.core.files.storage import Storage, get_storage_class
+from django.core.files.storage import Storage
 
 
 def random_string(length):
     return ''.join(random.sample(string.lowercase + string.digits, length))
+
 
 def RandomFilenameMetaStorage(storage_class):
     class RandomFilenameStorage(storage_class):
@@ -27,5 +28,5 @@ def RandomFilenameMetaStorage(storage_class):
                 if not self.exists(name):
                     return name
 
-    RandomFilenameStorage.__name__ = 'RandomFilename%s' % storage_class.__name__
+    RandomFilenameStorage.__name__ = 'RandomFilename' + storage_class.__name__
     return RandomFilenameStorage
