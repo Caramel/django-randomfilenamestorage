@@ -14,13 +14,15 @@ def random_string(length):
     return ''.join(random.choice(CHARACTERS) for i in xrange(length))
 
 
-def RandomFilenameMetaStorage(storage_class):
+def RandomFilenameMetaStorage(storage_class, length=None):
     class RandomFilenameStorage(storage_class):
         def __init__(self, *args, **kwargs):
-            self.length = kwargs.pop('length', None)
-            if self.length is None:
-                self.length = getattr(settings, 'RANDOM_FILENAME_LENGTH',
-                                      DEFAULT_LENGTH)
+            self.randomfilename_length = kwargs.pop('randomfilename_length',
+                                                    length)
+            if self.randomfilename_length is None:
+                self.randomfilename_length = getattr(settings,
+                                                     'RANDOM_FILENAME_LENGTH',
+                                                     DEFAULT_LENGTH)
             super(RandomFilenameStorage, self).__init__(*args, **kwargs)
 
         def get_available_name(self, name):
@@ -29,7 +31,7 @@ def RandomFilenameMetaStorage(storage_class):
             # If the filename already exists, keep on generating random
             # filenames until the generated filename doesn't exist.
             while True:
-                file_prefix = random_string(self.length)
+                file_prefix = random_string(self.randomfilename_length)
                 # file_ext includes the dot.
                 name = os.path.join(dir_name, file_prefix + file_ext)
                 if not self.exists(name):
