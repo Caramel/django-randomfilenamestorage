@@ -2,7 +2,7 @@ import os
 import random
 import string
 
-
+from django.conf import settings
 from django.core.files.storage import Storage
 
 
@@ -13,7 +13,9 @@ def random_string(length):
 def RandomFilenameMetaStorage(storage_class):
     class RandomFilenameStorage(storage_class):
         def __init__(self, *args, **kwargs):
-            self.root_size = kwargs.pop('root_size', 16)
+            self.length = kwargs.pop('length', None)
+            if self.length is None:
+                self.length = getattr(settings, 'RANDOM_FILENAME_LENGTH', 16)
             super(RandomFilenameStorage, self).__init__(*args, **kwargs)
 
         def get_available_name(self, name):
@@ -22,7 +24,7 @@ def RandomFilenameMetaStorage(storage_class):
             # If the filename already exists, keep on generating random
             # filenames until the generated filename doesn't exist.
             while True:
-                file_prefix = random_string(self.root_size)
+                file_prefix = random_string(self.length)
                 # file_ext includes the dot.
                 name = os.path.join(dir_name, file_prefix + file_ext)
                 if not self.exists(name):
