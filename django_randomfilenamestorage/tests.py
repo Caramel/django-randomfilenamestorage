@@ -11,7 +11,8 @@ from django.test import TestCase
 from django.utils.functional import LazyObject
 
 from django_randomfilenamestorage.storage import (
-    RandomFilenameMetaStorage, RandomFilenameFileSystemStorage
+    RandomFilenameMetaStorage, RandomFilenameFileSystemStorage,
+    DEFAULT_LENGTH
 )
 
 
@@ -21,7 +22,7 @@ class StubStorage(object):
 
 
 class RandomFilenameTestCase(TestCase):
-    def assertFilename(self, name, original, length=16):
+    def assertFilename(self, name, original, length=DEFAULT_LENGTH):
         dirname, pathname = posixpath.split(original)
         if dirname:
             dirname += posixpath.sep
@@ -45,7 +46,7 @@ class RandomFilenameTestCase(TestCase):
             self.assertFilename(storage.get_available_name(''), '', length=20)
 
     def test_get_available_name(self):
-        storage = RandomFilenameFileSystemStorage(length=16)
+        storage = RandomFilenameFileSystemStorage(length=DEFAULT_LENGTH)
         self.assertFilename(storage.get_available_name(''), '')
         self.assertFilename(storage.get_available_name('foo'), 'foo')
         self.assertFilename(storage.get_available_name('foo.txt'), 'foo.txt')
@@ -54,7 +55,7 @@ class RandomFilenameTestCase(TestCase):
                             'foo/bar.txt')
 
     def test_save(self):
-        storage = RandomFilenameFileSystemStorage(length=16)
+        storage = RandomFilenameFileSystemStorage(length=DEFAULT_LENGTH)
         name1 = storage.save('foo/bar.txt', ContentFile('Hello world!'))
         storage.delete(name1)
         self.assertFilename(name1, 'foo/bar.txt')

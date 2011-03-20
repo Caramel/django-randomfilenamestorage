@@ -7,6 +7,7 @@ from django.core.files.storage import Storage, FileSystemStorage
 
 
 CHARACTERS = string.lowercase + string.digits
+DEFAULT_LENGTH = 16
 
 
 def random_string(length):
@@ -18,7 +19,8 @@ def RandomFilenameMetaStorage(storage_class):
         def __init__(self, *args, **kwargs):
             self.length = kwargs.pop('length', None)
             if self.length is None:
-                self.length = getattr(settings, 'RANDOM_FILENAME_LENGTH', 16)
+                self.length = getattr(settings, 'RANDOM_FILENAME_LENGTH',
+                                      DEFAULT_LENGTH)
             super(RandomFilenameStorage, self).__init__(*args, **kwargs)
 
         def get_available_name(self, name):
