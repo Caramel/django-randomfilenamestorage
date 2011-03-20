@@ -2,6 +2,7 @@ from __future__ import with_statement
 
 from contextlib import contextmanager
 
+import posixpath
 import re
 
 from django.conf import settings
@@ -20,56 +21,46 @@ class StubStorage(object):
 
 
 class RandomFilenameTestCase(TestCase):
-    def assertFilename(self, name, length=16):
-        self.assertTrue(re.match(r'[0-9a-z]{%d}(?:\..+)?$' % length, name),
-                        '%r is invalid.' % name)
+    def assertFilename(self, name, original, length=16):
+        dirname, pathname = posixpath.split(original)
+        if dirname:
+            dirname += posixpath.sep
+        root, ext = posixpath.splitext(pathname)
+        regexp = re.compile(r'%s[0-9a-z]{%d}%s$' % (re.escape(dirname),
+                                                    length,
+                                                    re.escape(ext)))
+        self.assertTrue(regexp.match(name), '%r is invalid.' % name)
 
     def test_init(self):
         StorageClass = RandomFilenameMetaStorage(storage_class=StubStorage)
         with patch(settings, RANDOM_FILENAME_LENGTH=NotImplemented):
             storage = StorageClass()
-            self.assertFilename(storage.get_available_name(''))
+            self.assertFilename(storage.get_available_name(''), '')
             storage = StorageClass(length=10)
-            self.assertFilename(storage.get_available_name(''), length=10)
+            self.assertFilename(storage.get_available_name(''), '', length=10)
         with patch(settings, RANDOM_FILENAME_LENGTH=5):
             storage = StorageClass()
-            self.assertFilename(storage.get_available_name(''), length=5)
+            self.assertFilename(storage.get_available_name(''), '', length=5)
             storage = StorageClass(length=20)
-            self.assertFilename(storage.get_available_name(''), length=20)
+            self.assertFilename(storage.get_available_name(''), '', length=20)
 
     def test_get_available_name(self):
-        length = 16
-        storage = RandomFilenameFileSystemStorage(length=length)
-        name = storage.get_available_name('')
-        self.assertTrue(re.match(r'[0-9a-z]{%d}$' % length, name),
-                        '%r is invalid.' % name)
-        name = storage.get_available_name('foo')
-        self.assertTrue(re.match(r'[0-9a-z]{%d}$' % length, name),
-                        '%r is invalid.' % name)
-        name = storage.get_available_name('foo.txt')
-        self.assertTrue(re.match(r'[0-9a-z]{%d}\.txt$' % length, name),
-                        '%r is invalid.' % name)
-        name = storage.get_available_name('foo/bar')
-        self.assertTrue(re.match(r'foo/[0-9a-z]{%d}$' % length, name),
-                        '%r is invalid.' % name)
-        name = storage.get_available_name('foo/bar\.txt')
-        self.assertTrue(re.match(r'foo/[0-9a-z]{%d}\.txt$' % length,
-                                 name),
-                        '%r is invalid.' % name)
+        storage = RandomFilenameFileSystemStorage(length=16)
+        self.assertFilename(storage.get_available_name(''), '')
+        self.assertFilename(storage.get_available_name('foo'), 'foo')
+        self.assertFilename(storage.get_available_name('foo.txt'), 'foo.txt')
+        self.assertFilename(storage.get_available_name('foo/bar'), 'foo/bar')
+        self.assertFilename(storage.get_available_name('foo/bar.txt'),
+                            'foo/bar.txt')
 
     def test_save(self):
-        length = 16
-        storage = RandomFilenameFileSystemStorage(length=length)
-        name1 = storage.save('foo/bar\.txt', ContentFile('Hello world!'))
+        storage = RandomFilenameFileSystemStorage(length=16)
+        name1 = storage.save('foo/bar.txt', ContentFile('Hello world!'))
         storage.delete(name1)
-        self.assertTrue(re.match(r'foo/[0-9a-z]{%d}\.txt$' % length,
-                                 name1),
-                        '%r is invalid.' % name1)
-        name2 = storage.save('foo/bar\.txt', ContentFile('Hello world!'))
+        self.assertFilename(name1, 'foo/bar.txt')
+        name2 = storage.save('foo/bar.txt', ContentFile('Hello world!'))
         storage.delete(name2)
-        self.assertTrue(re.match(r'foo/[0-9a-z]{%d}\.txt$' % length,
-                                 name2),
-                        '%r is invalid.' % name2)
+        self.assertFilename(name2, 'foo/bar.txt')
         self.assertNotEqual(name1, name2)
 
 
