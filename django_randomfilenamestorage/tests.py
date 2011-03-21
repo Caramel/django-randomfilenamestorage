@@ -6,6 +6,7 @@ import errno
 import os
 import posixpath
 import re
+import shutil
 import warnings
 
 try:
@@ -100,15 +101,18 @@ class RandomFilenameTestCase(TestCase):
             self.assertFilename(storage.get_available_name(''), '', length=20)
 
     def test_get_available_name(self):
-        storage = RandomFilenameFileSystemStorage(
-            randomfilename_length=DEFAULT_LENGTH
-        )
-        self.assertFilename(storage.get_available_name(''), '')
-        self.assertFilename(storage.get_available_name('foo'), 'foo')
-        self.assertFilename(storage.get_available_name('foo.txt'), 'foo.txt')
-        self.assertFilename(storage.get_available_name('foo/bar'), 'foo/bar')
-        self.assertFilename(storage.get_available_name('foo/bar.txt'),
-                            'foo/bar.txt')
+        with media_root():
+            storage = RandomFilenameFileSystemStorage(
+                randomfilename_length=DEFAULT_LENGTH
+            )
+            self.assertFilename(storage.get_available_name(''), '')
+            self.assertFilename(storage.get_available_name('foo'), 'foo')
+            self.assertFilename(storage.get_available_name('foo.txt'),
+                                'foo.txt')
+            self.assertFilename(storage.get_available_name('foo/bar'),
+                                'foo/bar')
+            self.assertFilename(storage.get_available_name('foo/bar.txt'),
+                                'foo/bar.txt')
 
     def test_get_available_name_retry(self):
         # With retries
@@ -130,24 +134,27 @@ class RandomFilenameTestCase(TestCase):
                              '1.txt')
 
     def test_save(self):
-        storage = RandomFilenameFileSystemStorage(
-            randomfilename_length=DEFAULT_LENGTH
-        )
-        name1 = storage.save('foo/bar.txt', ContentFile('Hello world!'))
-        storage.delete(name1)
-        self.assertFilename(name1, 'foo/bar.txt')
-        name2 = storage.save('foo/bar.txt', ContentFile('Hello world!'))
-        storage.delete(name2)
-        self.assertFilename(name2, 'foo/bar.txt')
-        self.assertNotEqual(name1, name2)
+        with media_root():
+            storage = RandomFilenameFileSystemStorage(
+                randomfilename_length=DEFAULT_LENGTH
+            )
+            name1 = storage.save('foo/bar.txt', ContentFile('Hello world!'))
+            storage.delete(name1)
+            self.assertFilename(name1, 'foo/bar.txt')
+            name2 = storage.save('foo/bar.txt', ContentFile('Hello world!'))
+            storage.delete(name2)
+            self.assertFilename(name2, 'foo/bar.txt')
+            self.assertNotEqual(name1, name2)
 
     def test_save_exception(self):
-        storage = RandomFilenameFileSystemStorage(
-            randomfilename_length=DEFAULT_LENGTH
-        )
-        name = storage.save('foo/bar.txt', ContentFile('Hello world!'))
-        self.assertRaises(IOError, storage.save,
-                          name + posixpath.sep, ContentFile('Hello world!'))
+        with media_root():
+            storage = RandomFilenameFileSystemStorage(
+                randomfilename_length=DEFAULT_LENGTH
+            )
+            name = storage.save('foo/bar.txt', ContentFile('Hello world!'))
+            self.assertRaises(IOError, storage.save,
+                              name + posixpath.sep,
+                              ContentFile('Hello world!'))
 
     def test_save_safe_storage(self):
         StorageClass = RandomFilenameMetaStorage(storage_class=StubSafeStorage)
@@ -210,3 +217,15 @@ def patch(namespace, **values):
                     delattr(namespace, name)
             else:
                 setattr(namespace, name, original_value)
+
+
+@contextmanager
+def media_root(dirname='test_media/'):
+    if os.path.exists(dirname):
+        raise Exception('Cannot run tests safely, %r already exists!' %
+                        dirname)
+    try:
+        with patch(settings, MEDIA_ROOT=dirname):
+            yield
+    finally:
+        shutil.rmtree(dirname, ignore_errors=True)
