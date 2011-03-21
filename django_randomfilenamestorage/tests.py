@@ -58,6 +58,11 @@ class StubSafeStorage(StubStorage):
         return name
 
 
+class StubBrokenStorage(StubStorage):
+    def _save(self, *args, **kwargs):
+        raise OSError(errno.ENOENT, os.strerror(errno.ENOENT))
+
+
 def stub_random_string(*args, **kwargs):
     stub_random_string.count += 1
     return str(stub_random_string.count)
@@ -155,6 +160,13 @@ class RandomFilenameTestCase(TestCase):
             self.assertRaises(IOError, storage.save,
                               name + posixpath.sep,
                               ContentFile('Hello world!'))
+
+    def test_save_broken(self):
+        StorageClass = RandomFilenameMetaStorage(
+            storage_class=StubBrokenStorage
+        )
+        storage = StorageClass()
+        self.assertRaises(OSError, storage._save, 'name.txt')
 
     def test_save_safe_storage(self):
         StorageClass = RandomFilenameMetaStorage(storage_class=StubSafeStorage)
