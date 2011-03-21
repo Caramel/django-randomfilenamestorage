@@ -59,7 +59,7 @@ def RandomFilenameMetaStorage(storage_class, length=None, uniquify_names=True):
                     return super(RandomFilenameStorage, self)._save(name,
                                                                     *args,
                                                                     **kwargs)
-                except IOError, e:
+                except OSError, e:
                     if e.errno == EEXIST:
                         # We have a safe storage layer
                         if not self.randomfilename_uniquify_names:

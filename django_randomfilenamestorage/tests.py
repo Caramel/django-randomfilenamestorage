@@ -51,10 +51,8 @@ class StubSafeStorage(StubStorage):
     def _save(self, name, *args, **kwargs):
         # Raise errno.EEXIST until _save() has been called *tries* times.
         self._save_count += 1
-        if name.endswith('/'):
-            raise IOError(errno.EISDIR, os.strerror(errno.EISDIR))
         if self._save_count < self._tries:
-            raise IOError(errno.EEXIST, os.strerror(errno.EEXIST))
+            raise OSError(errno.EEXIST, os.strerror(errno.EEXIST))
         return name
 
 
@@ -171,7 +169,7 @@ class RandomFilenameTestCase(TestCase):
                                                  uniquify_names=False)
         storage = StorageClass(tries=2)
         with patch(django_randomfilenamestorage.storage):
-            self.assertRaises(IOError, storage._save, 'name.txt')
+            self.assertRaises(OSError, storage._save, 'name.txt')
 
     def test_save_broken_retry(self):
         StorageClass = RandomFilenameMetaStorage(storage_class=StubSafeStorage)
