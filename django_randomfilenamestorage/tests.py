@@ -7,6 +7,7 @@ import os
 import posixpath
 import re
 import shutil
+import stat
 import warnings
 
 try:
@@ -21,13 +22,14 @@ except ImportError:
 
 from django.conf import settings
 from django.core.files.base import ContentFile
+from django.core.files.uploadedfile import TemporaryUploadedFile
 from django.test import TestCase
 from django.utils.functional import LazyObject
 
 import django_randomfilenamestorage.storage
 from django_randomfilenamestorage.storage import (
     RandomFilenameMetaStorage, RandomFilenameFileSystemStorage,
-    DEFAULT_LENGTH
+    SafeFileSystemStorage, DEFAULT_LENGTH
 )
 
 
@@ -186,6 +188,68 @@ class RandomFilenameTestCase(TestCase):
                 # stub_random_string() is called four times, when attempting
                 # to save three times
                 self.assertEqual(storage._save('name.txt'), '4.txt')
+
+
+class SafeFileSystemStorageTestCase(TestCase):
+    def test_init(self):
+        storage = SafeFileSystemStorage()
+        self.assertTrue(storage.uniquify_names)
+        storage = SafeFileSystemStorage(uniquify_names=True)
+        self.assertTrue(storage.uniquify_names)
+        storage = SafeFileSystemStorage(uniquify_names=False)
+        self.assertFalse(storage.uniquify_names)
+
+    def test_save(self):
+        with media_root():
+            storage = SafeFileSystemStorage()
+            # Save one copy
+            content = 'Hello world!'
+            name = storage.save('hello.txt', ContentFile(content))
+            self.assertEqual(name, 'hello.txt')
+            self.assertEqual(open(storage.path(name)).read(), content)
+            # Save another, which should be renamed
+            content = 'Hello.'
+            name = storage._save('hello.txt', ContentFile(content))
+            self.assertTrue(name in ('hello_.txt', 'hello_1.txt'),
+                            "%r is not 'hello_.txt' or 'hello_1.txt'" % name)
+            self.assertEqual(open(storage.path(name)).read(), content)
+
+    def test_save_no_uniquify(self):
+        with media_root():
+            storage = SafeFileSystemStorage(uniquify_names=False)
+            # Save one copy
+            content = 'Hello world!'
+            name = storage.save('hello.txt', ContentFile(content))
+            self.assertEqual(name, 'hello.txt')
+            self.assertEqual(open(storage.path(name)).read(), content)
+            # Save another, which should throw an exception
+            content = 'Hello.'
+            self.assertRaises(OSError,
+                              storage._save, 'hello.txt', ContentFile(content))
+
+    def test_save_tempfile(self):
+        with media_root():
+            storage = SafeFileSystemStorage()
+            content = 'Hello world!'
+            f = TemporaryUploadedFile(name='filename',
+                                      content_type='text/plain',
+                                      size=len(content),
+                                      charset='utf-8')
+            f.write(content)
+            f.seek(0)
+            name = storage.save('hello.txt', f)
+            self.assertEqual(name, 'hello.txt')
+            self.assertEqual(open(storage.path(name)).read(), content)
+
+    def test_save_permissions(self):
+        with media_root():
+            with patch(settings, FILE_UPLOAD_PERMISSIONS=stat.S_IRUSR):
+                storage = SafeFileSystemStorage()
+                content = 'Hello world!'
+                name = storage.save('hello.txt', ContentFile('Hello world!'))
+                self.assertTrue(os.access(storage.path(name), os.R_OK))
+                self.assertFalse(os.access(storage.path(name), os.W_OK))
+                self.assertFalse(os.access(storage.path(name), os.X_OK))
 
 
 @contextmanager

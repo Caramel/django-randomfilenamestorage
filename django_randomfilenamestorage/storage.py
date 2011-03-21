@@ -1,12 +1,14 @@
 from errno import EEXIST
 import ntpath
+import os
 import posixpath
 import random
 import string
 from warnings import warn
 
 from django.conf import settings
-from django.core.files.storage import Storage, FileSystemStorage
+from django.core.files.storage import (Storage, FileSystemStorage,
+                                       locks, file_move_safe)
 
 
 CHARACTERS = string.lowercase + string.digits
@@ -88,6 +90,10 @@ class SafeFileSystemStorage(FileSystemStorage):
 
     Based on django.core.files.storage.FileSystemStorage.
     """
+    def __init__(self, *args, **kwargs):
+        self.uniquify_names = kwargs.pop('uniquify_names', True)
+        super(SafeFileSystemStorage, self).__init__(*args, **kwargs)
+
     def _save(self, name, content):
         full_path = self.path(name)
 
@@ -125,8 +131,10 @@ class SafeFileSystemStorage(FileSystemStorage):
                         locks.unlock(fd)
                         os.close(fd)
             except OSError, e:
-                if e.errno == errno.EEXIST:
+                if e.errno == EEXIST:
                     # Ooops, the file exists. We need a new file name.
+                    if not self.uniquify_names:
+                        raise
                     name = self.get_available_name(name)
                     full_path = self.path(name)
                 else:
