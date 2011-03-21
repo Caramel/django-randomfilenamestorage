@@ -3,7 +3,7 @@ from setuptools import find_packages, setup
 
 setup(
     name='django-randomfilenamestorage',
-    version='1.0',
+    version='1.1',
     description=('A Django storage backend that gives random names to files.'),
     long_description=open('README.rst', 'r').read(),
     author='Akoha Inc.',
