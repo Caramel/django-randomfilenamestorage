@@ -1,5 +1,5 @@
 from errno import EEXIST
-import os
+import ntpath
 import posixpath
 import random
 import string
@@ -39,15 +39,17 @@ def RandomFilenameMetaStorage(storage_class, length=None, uniquify_names=True):
                 super(RandomFilenameStorage, self).__init__(*args, **kwargs)
 
         def get_available_name(self, name, retry=True):
-            dir_name, file_name = os.path.split(name)
-            file_root, file_ext = os.path.splitext(file_name)
+            # All directories have forward slashes, even on Windows
+            name = name.replace(ntpath.sep, posixpath.sep)
+            dir_name, file_name = posixpath.split(name)
+            file_root, file_ext = posixpath.splitext(file_name)
             # If retry is True and the filename already exists, keep
             # on generating random filenames until the generated
             # filename doesn't exist.
             while True:
                 file_prefix = random_string(self.randomfilename_length)
                 # file_ext includes the dot.
-                name = os.path.join(dir_name, file_prefix + file_ext)
+                name = posixpath.join(dir_name, file_prefix + file_ext)
                 if not retry or not self.exists(name):
                     return name
 
