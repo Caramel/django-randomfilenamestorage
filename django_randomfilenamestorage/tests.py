@@ -2,14 +2,28 @@ from __future__ import with_statement
 
 from contextlib import contextmanager
 
+import errno
+import os
 import posixpath
 import re
+import warnings
+
+try:
+    from warnings import catch_warnings
+except ImportError:
+    def catch_warnings():
+        original_filters = warnings.filters
+        try:
+            yield
+        finally:
+            warnings.filters = original_filters
 
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.test import TestCase
 from django.utils.functional import LazyObject
 
+import django_randomfilenamestorage.storage
 from django_randomfilenamestorage.storage import (
     RandomFilenameMetaStorage, RandomFilenameFileSystemStorage,
     DEFAULT_LENGTH
@@ -17,8 +31,35 @@ from django_randomfilenamestorage.storage import (
 
 
 class StubStorage(object):
-    def exists(*args, **kwargs):
-        return False
+    def __init__(self, tries=1):
+        self._exists_count = 0
+        self._tries = tries
+
+    def exists(self, *args, **kwargs):
+        # Return False until exists() has been called *tries* times.
+        self._exists_count += 1
+        return self._exists_count < self._tries
+
+
+class StubSafeStorage(StubStorage):
+    def __init__(self, uniquify_names=False, *args, **kwargs):
+        # Support uniquify_names as an argument
+        self._save_count = 0
+        super(StubSafeStorage, self).__init__(*args, **kwargs)
+
+    def _save(self, name, *args, **kwargs):
+        # Raise errno.EEXIST until _save() has been called *tries* times.
+        self._save_count += 1
+        if name.endswith('/'):
+            raise IOError(errno.EISDIR, os.strerror(errno.EISDIR))
+        if self._save_count < self._tries:
+            raise IOError(errno.EEXIST, os.strerror(errno.EEXIST))
+        return name
+
+
+def stub_random_string(*args, **kwargs):
+    stub_random_string.count += 1
+    return str(stub_random_string.count)
 
 
 class RandomFilenameTestCase(TestCase):
@@ -69,6 +110,25 @@ class RandomFilenameTestCase(TestCase):
         self.assertFilename(storage.get_available_name('foo/bar.txt'),
                             'foo/bar.txt')
 
+    def test_get_available_name_retry(self):
+        # With retries
+        StorageClass = RandomFilenameMetaStorage(storage_class=StubStorage)
+        storage = StorageClass(tries=2)
+        stub_random_string.count = 0
+        with patch(django_randomfilenamestorage.storage,
+                   random_string=stub_random_string):
+            self.assertEqual(storage.get_available_name('name.txt'), '2.txt')
+
+        # Without retries
+        StorageClass = RandomFilenameMetaStorage(storage_class=StubStorage)
+        storage = StorageClass(tries=2)
+        stub_random_string.count = 0
+        with patch(django_randomfilenamestorage.storage,
+                   random_string=stub_random_string):
+            self.assertEqual(storage.get_available_name('name.txt',
+                                                        retry=False),
+                             '1.txt')
+
     def test_save(self):
         storage = RandomFilenameFileSystemStorage(
             randomfilename_length=DEFAULT_LENGTH
@@ -80,6 +140,47 @@ class RandomFilenameTestCase(TestCase):
         storage.delete(name2)
         self.assertFilename(name2, 'foo/bar.txt')
         self.assertNotEqual(name1, name2)
+
+    def test_save_exception(self):
+        storage = RandomFilenameFileSystemStorage(
+            randomfilename_length=DEFAULT_LENGTH
+        )
+        name = storage.save('foo/bar.txt', ContentFile('Hello world!'))
+        self.assertRaises(IOError, storage.save,
+                          name + posixpath.sep, ContentFile('Hello world!'))
+
+    def test_save_safe_storage(self):
+        StorageClass = RandomFilenameMetaStorage(storage_class=StubSafeStorage)
+        storage = StorageClass(tries=3)
+        stub_random_string.count = 0
+        with patch(django_randomfilenamestorage.storage,
+                   random_string=stub_random_string):
+            # stub_random_string() is called 4 times, when attempting
+            # to save three times.
+            self.assertEqual(storage._save('name.txt'), '2.txt')
+
+    def test_save_no_uniquify(self):
+        StorageClass = RandomFilenameMetaStorage(storage_class=StubSafeStorage,
+                                                 uniquify_names=False)
+        storage = StorageClass(tries=2)
+        with patch(django_randomfilenamestorage.storage):
+            self.assertRaises(IOError, storage._save, 'name.txt')
+
+    def test_save_broken_retry(self):
+        StorageClass = RandomFilenameMetaStorage(storage_class=StubSafeStorage)
+        class BrokenStorage(StorageClass):
+            def get_available_name(self, name):
+                return super(BrokenStorage, self).get_available_name(name)
+
+        storage = BrokenStorage(tries=3)
+        stub_random_string.count = 0
+        with patch(django_randomfilenamestorage.storage,
+                   random_string=stub_random_string):
+            with catch_warnings():
+                warnings.simplefilter('ignore')
+                # stub_random_string() is called four times, when attempting
+                # to save three times
+                self.assertEqual(storage._save('name.txt'), '4.txt')
 
 
 @contextmanager
