@@ -75,6 +75,7 @@ of round-trips to the underlying storage class and make random
 filename generation more efficient.
 
 Safe storage classes include:
+
 * ``django_randomfilenamestorage.storage.SafeFileSystemStorage``
 * `django-dbstorage`_.
 
