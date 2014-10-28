@@ -10,7 +10,7 @@ setup(
     author_email='adminmail@akoha.com',
     url='http://bitbucket.org/akoha/django-randomfilenamestorage/',
     packages=find_packages(),
-    install_requires=['Django>=1.0'],
+    install_requires=['Django>=1.0,<1.7'],
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Environment :: Web Environment',
